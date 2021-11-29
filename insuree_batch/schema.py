@@ -104,7 +104,7 @@ class CreateInsureeBatchMutation(OpenIMISMutation):
 
             location_id = data.get("location")
             if location_id:
-                location = Location.objects.filter(id=location_id).first()
+                location = Location.filter_queryset().filter(id=location_id).first()
                 if not location:
                     raise ValidationError(_("insureebatch.location_id_not_found"))
             else:
