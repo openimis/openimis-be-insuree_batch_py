@@ -18,3 +18,12 @@ class BatchInsureeNumber(core_models.UUIDModel):
     batch = models.ForeignKey(InsureeBatch, on_delete=models.CASCADE, db_index=True, related_name="insuree_numbers")
     insuree_number = models.CharField(db_column='CHFID', max_length=12, blank=True, null=True)
     print_date = models.DateTimeField(blank=True, null=True)
+
+
+class InsureeBatchMutation(core_models.UUIDModel, core_models.ObjectMutation):
+    insuree_batch = models.ForeignKey(InsureeBatch, models.DO_NOTHING, related_name='mutations')
+    mutation = models.ForeignKey(core_models.MutationLog, models.DO_NOTHING, related_name='insuree_batches')
+
+    class Meta:
+        managed = True
+        db_table = "insuree_batch_InsureeBatchMutation"

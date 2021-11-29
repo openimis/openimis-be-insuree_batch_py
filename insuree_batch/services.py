@@ -5,6 +5,8 @@ import os
 import random
 import tempfile
 import zipfile
+from datetime import datetime
+from functools import lru_cache
 
 from django.db.models import Max
 
@@ -60,21 +62,16 @@ def get_random(length):
     return random.randint(10 ** (length - 1), (10 ** length) - 1)
 
 
-location_id_len = None
-
-
+@lru_cache(maxsize=None)
 def get_location_id_len():
     """
     Determines the length of the location ID and saves it in a global variable for performance
     :return: length of the biggest Location.id
     """
-    global location_id_len
-    if not location_id_len:
-        location_id_len = len(str(Location.objects.aggregate(Max("id")).get("id__max")))
-    return location_id_len
+    return len(str(Location.objects.aggregate(Max("id")).get("id__max")))
 
 
-def export_insurees(batch=None, amount=None):
+def export_insurees(batch=None, amount=None, dry_run=False):
     to_export = get_insurees_to_export(batch, amount)
     if to_export is None:
         return None
@@ -97,7 +94,7 @@ def export_insurees(batch=None, amount=None):
                     insuree.other_names,
                     insuree.last_name,
                     insuree.dob,
-                    insuree.gender,
+                    insuree.gender.code,
                 ])
 
                 if photo_filename:
@@ -105,6 +102,11 @@ def export_insurees(batch=None, amount=None):
                         photo_bytes = insuree.photo.photo.encode("utf-8")
                         decoded_photo = base64.decodebytes(photo_bytes)
                         photo_file.write(decoded_photo)
+
+        if not dry_run:
+            BatchInsureeNumber.objects\
+                .filter(insuree_number__in=[i.chf_id for i in to_export])\
+                .update(print_date=datetime.now())
 
         zf = zipfile.ZipFile(zip_file_path, "w")
         for file in files_to_zip:
