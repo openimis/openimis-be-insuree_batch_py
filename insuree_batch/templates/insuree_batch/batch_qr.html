@@ -1,0 +1,20 @@
+<html>
+<head>
+    <title></title>
+</head>
+<body>
+<h1>openIMIS batch {{ batch.id }}</h1>
+<div>{{ batch.comment }}</div>
+
+<div style="display: flex; flex-direction: row; justify-content: center; break-inside: avoid; gap: 8px;">
+{% for item in insuree_ids %}
+    <div style="display: flex; flex-wrap: wrap; gap: 16px">
+        {{ item.insuree_number }}
+        <div>
+        {{ item.qr|safe }}
+        </div>
+    </div>
+{% endfor %}
+</div>
+</body>
+</html>
