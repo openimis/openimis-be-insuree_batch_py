@@ -24,10 +24,27 @@ logger = logging.getLogger(__file__)
 
 class InsureeBatchGQLType(DjangoObjectType):
     print_url = graphene.Field(graphene.String)
+    export_url = graphene.Field(
+        graphene.String, dry_run=graphene.Boolean(), count=graphene.Int()
+    )
+    nb_generated = graphene.Field(graphene.Int)
+    nb_printed = graphene.Field(graphene.Int)
+
+    def resolve_nb_generated(self, info):
+        return self.insuree_numbers.count()
+
+    def resolve_nb_printed(self, info):
+        return self.insuree_numbers.filter(print_date__isnull=False).count()
 
     def resolve_print_url(self, info):
         return info.context.build_absolute_uri(
             reverse("batch_qr") + f"?batch={self.id}"
+        )
+
+    def resolve_export_url(self, info, count=None, dry_run=False):
+        return info.context.build_absolute_uri(
+            reverse("export_insurees")
+            + f"?batch={self.id}&dryRun={dry_run}&count={count}"
         )
 
     class Meta:
