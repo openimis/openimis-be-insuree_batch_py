@@ -4,6 +4,7 @@ from django.db import connection
 from core import prefix_filterset, ExtendedConnection
 from core.schema import OpenIMISMutation, OrderedDjangoFilterConnectionField
 from graphene import ObjectType
+from django.urls import reverse
 from graphene_django import DjangoObjectType
 from graphene_django.filter import DjangoFilterConnectionField
 from django.contrib.auth.models import AnonymousUser
@@ -22,6 +23,13 @@ logger = logging.getLogger(__file__)
 
 
 class InsureeBatchGQLType(DjangoObjectType):
+    print_url = graphene.Field(graphene.String)
+
+    def resolve_print_url(self, info):
+        return info.context.build_absolute_uri(
+            reverse("batch_qr") + f"?batch={self.id}"
+        )
+
     class Meta:
         model = InsureeBatch
         interfaces = (graphene.relay.Node,)
@@ -33,7 +41,6 @@ class InsureeBatchGQLType(DjangoObjectType):
             **prefix_filterset("location__", LocationGQLType._meta.filter_fields),
         }
         connection_class = ExtendedConnection
-
 
 
 class BatchInsureeNumberGQLType(DjangoObjectType):
@@ -52,24 +59,31 @@ class Query(graphene.ObjectType):
     insuree_batches = OrderedDjangoFilterConnectionField(
         InsureeBatchGQLType,
         client_mutation_id=graphene.String(),
-        orderBy=graphene.List(of_type=graphene.String))
+        orderBy=graphene.List(of_type=graphene.String),
+    )
 
     batch_insuree_numbers = OrderedDjangoFilterConnectionField(
-        InsureeBatchGQLType,
-        orderBy=graphene.List(of_type=graphene.String))
+        InsureeBatchGQLType, orderBy=graphene.List(of_type=graphene.String)
+    )
 
     def resolve_insuree_batches(self, info, client_mutation_id=None, **kwargs):
-        if not info.context.user.has_perms(InsureeBatchConfig.gql_query_batch_runs_perms):
+        if not info.context.user.has_perms(
+            InsureeBatchConfig.gql_query_batch_runs_perms
+        ):
             raise PermissionDenied(_("unauthorized"))
         if client_mutation_id:
-            queryset = InsureeBatch.objects.filter(Q(mutations__mutation__client_mutation_id=client_mutation_id))
+            queryset = InsureeBatch.objects.filter(
+                Q(mutations__mutation__client_mutation_id=client_mutation_id)
+            )
         else:
             queryset = InsureeBatch.objects
 
         return queryset
 
     def resolve_batch_insuree_numbers(self, info, **kwargs):
-        if not info.context.user.has_perms(InsureeBatchConfig.gql_query_batch_runs_perms):
+        if not info.context.user.has_perms(
+            InsureeBatchConfig.gql_query_batch_runs_perms
+        ):
             raise PermissionDenied(_("unauthorized"))
 
 
@@ -83,6 +97,7 @@ class CreateInsureeBatchMutation(OpenIMISMutation):
     """
     Create a new insuree batch
     """
+
     _mutation_module = "insuree_batch"
     _mutation_class = "CreateInsureeBatchMutation"
 
@@ -93,13 +108,15 @@ class CreateInsureeBatchMutation(OpenIMISMutation):
     def async_mutate(cls, user, **data):
         try:
             if type(user) is AnonymousUser or not user.id:
-                raise ValidationError(
-                    _("mutation.authentication_required"))
-            if not user.has_perms(InsureeBatchConfig.gql_mutation_create_insuree_batch_perms):
+                raise ValidationError(_("mutation.authentication_required"))
+            if not user.has_perms(
+                InsureeBatchConfig.gql_mutation_create_insuree_batch_perms
+            ):
                 raise PermissionDenied(_("unauthorized"))
-            data['audit_user_id'] = user.id_for_audit
+            data["audit_user_id"] = user.id_for_audit
             from core.utils import TimeUtils
-            data['validity_from'] = TimeUtils.now()
+
+            data["validity_from"] = TimeUtils.now()
             client_mutation_id = data.get("client_mutation_id")
 
             location_id = data.get("location")
@@ -111,17 +128,24 @@ class CreateInsureeBatchMutation(OpenIMISMutation):
                 location = None
 
             batch = generate_insuree_numbers(
-                data.get("amount"), user.id_for_audit, location=location, comment=data.get("comment"))
-            InsureeBatchMutation.object_mutated(user, client_mutation_id=client_mutation_id, insuree_batch=batch)
+                data.get("amount"),
+                user.id_for_audit,
+                location=location,
+                comment=data.get("comment"),
+            )
+            InsureeBatchMutation.object_mutated(
+                user, client_mutation_id=client_mutation_id, insuree_batch=batch
+            )
             return None
         except Exception as exc:
             logger.exception("insuree.mutation.failed_to_create_insuree")
-            return [{
-                'message': _("insuree.mutation.failed_to_create_insuree"),
-                'detail': str(exc)}
+            return [
+                {
+                    "message": _("insuree.mutation.failed_to_create_insuree"),
+                    "detail": str(exc),
+                }
             ]
 
 
 class Mutation(graphene.ObjectType):
     create_insuree_batch = CreateInsureeBatchMutation.Field()
-

@@ -1,20 +1,75 @@
 <html>
 <head>
-    <title></title>
+    <title>Batch {{ batch.id }} </title>
+    <style>
+        body {
+            font-family: sans-serif;
+        }
+
+        .item-list {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 16px;
+            max-width: 100%;
+        }
+
+        @media (min-width: 900px) {
+            .item-list {
+                grid-template-columns: repeat(7, 1fr);
+            }
+        }
+
+        @media (min-width: 1200px) {
+            .item-list {
+                grid-template-columns: repeat(10, 1fr);
+            }
+        }
+        
+        .item {
+            display: flex;
+            gap: 8px;
+            padding: 16px;
+            border-radius: 2px;
+            border: 2px solid #D3D3D3;
+            flex-direction: column;
+            align-items: center;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+
+        .item-number {
+            font-family: monospace;
+            font-size: 1rem;
+        }
+
+        .qr {
+            break-inside: avoid-page;
+            page-break-inside: avoid;
+
+        }
+        h1 {
+            margin-bottom: 0;
+        }
+        h6 {
+            margin-top: 10px;
+        }
+
+    </style>
 </head>
 <body>
-<h1>openIMIS batch {{ batch.id }}</h1>
-<div>{{ batch.comment }}</div>
+    <h1>OpenIMIS Batch: {{ batch.id }}</h1>
+    <h6>Generated on {{batch.run_date}}</h6>
+    <p>{{ batch.comment }}</p>
 
-<div style="display: flex; flex-direction: row; justify-content: center; break-inside: avoid; gap: 8px;">
-{% for item in insuree_ids %}
-    <div style="display: flex; flex-wrap: wrap; gap: 16px">
-        {{ item.insuree_number }}
-        <div>
-        {{ item.qr|safe }}
+    <div class="item-list" >
+        {% for item in insuree_ids %}
+        <div class="item">
+            <b class="item-number">{{ item.insuree_number }}</b>
+            <div class="qr">
+            {{ item.qr|safe }}
+            </div>
         </div>
+        {% endfor %}
     </div>
-{% endfor %}
-</div>
 </body>
 </html>
