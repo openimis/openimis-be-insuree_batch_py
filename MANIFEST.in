@@ -1,2 +1,4 @@
 include LICENSE.md
 include README.md
+include insuree_batch/templates
+recursive-include insuree_batch/ *.html
