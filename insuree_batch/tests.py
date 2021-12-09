@@ -1,37 +1,47 @@
 import random
-from unittest import TestCase
+from django.test import TestCase, override_settings
 
 from core.models import Officer
 from insuree.apps import InsureeConfig
 from insuree.services import validate_insuree_number
 from insuree.test_helpers import create_test_insuree, create_test_photo
 from location.models import Location
+from location.test_helpers import create_test_location
 from .services import get_random, generate_insuree_number, generate_insuree_numbers, get_insurees_to_export, \
-    export_insurees
+    export_insurees, get_location_id_len
 
 
 class InsureeBatchTest(TestCase):
-    # def setUp(self) -> None:
-    #     self.i_user = InteractiveUser(
-    #         login_name="test_batch_run", audit_user_id=-1, id=97891
-    #     )
-    #     self.user = User(i_user=self.i_user)
+    def setUp(self) -> None:
+        self.test_location = create_test_location("D", valid=True, custom_props={"code": "99"})
 
+    def tearDown(self) -> None:
+        self.test_location.delete()
+
+    @override_settings(INSUREE_NUMBER_LENGTH='9', INSUREE_NUMBER_MODULE_ROOT='7')
     def test_generate_insuree_number(self):
         expected_length = InsureeConfig.get_insuree_number_length()
+        self.assertEqual(expected_length, 9)  # Forced in annotation
         random.seed(10)
         no_loc = generate_insuree_number()
         self.assertEqual(len(no_loc), expected_length)
         self.assertEqual(validate_insuree_number(no_loc), [])
 
-        test_location = Location.objects.filter(validity_to__isnull=True).first()
-        self.assertIsNotNone(test_location, "This test expects some locations to exist in DB.")
-        loc = generate_insuree_number(test_location)
+        self.assertIsNotNone(self.test_location, "This test expects some locations to exist in DB.")
+        loc = generate_insuree_number(self.test_location)
         self.assertEqual(len(loc), expected_length)
         self.assertEqual(validate_insuree_number(loc), [])
-        self.assertTrue(loc.startswith(f"{test_location.id:02}"))
-        self.assertEqual(loc, "011341676")
+        self.assertTrue(loc.startswith(f"{int(self.test_location.code):04}"))
+        self.assertEqual(loc, "009915334")
         random.seed()
+
+    def test_get_location_id_length(self):
+        long_location = create_test_location("D", valid=False, custom_props={"code": "2356575"})
+        length = get_location_id_len("D")
+        self.assertEqual(length, 4)
+        length = get_location_id_len("W")
+        self.assertEqual(length, 6)
+        long_location.delete()
 
     def test_random(self):
         for i in range(1, 10000):
@@ -39,6 +49,7 @@ class InsureeBatchTest(TestCase):
             self.assertGreaterEqual(num, 1000)
             self.assertLessEqual(num, 9999)
 
+    @override_settings(INSUREE_NUMBER_LENGTH='10', INSUREE_NUMBER_MODULE_ROOT='7')
     def test_generate_batch(self):
         random.seed(10)
         test_location = Location.objects.filter(validity_to__isnull=True).order_by("-id").first()
@@ -50,6 +61,7 @@ class InsureeBatchTest(TestCase):
         self.assertEqual(batch.insuree_numbers.count(), 100)
         batch.delete()
 
+    @override_settings(INSUREE_NUMBER_LENGTH='10', INSUREE_NUMBER_MODULE_ROOT='7')
     def test_get_insurees_to_export(self):
         random.seed(11)
         test_location = Location.objects.filter(validity_to__isnull=True).order_by("-id").first()
@@ -73,6 +85,7 @@ class InsureeBatchTest(TestCase):
             insuree.delete()
         batch.delete()
 
+    @override_settings(INSUREE_NUMBER_LENGTH='10', INSUREE_NUMBER_MODULE_ROOT='7')
     def test_export(self):
         random.seed(12)
         test_location = Location.objects.filter(validity_to__isnull=True).order_by("-id").first()

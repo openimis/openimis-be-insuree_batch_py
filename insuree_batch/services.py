@@ -9,6 +9,7 @@ from datetime import datetime
 from functools import lru_cache
 
 from django.db.models import Max
+from django.db.models.functions import Length
 
 from insuree.apps import InsureeConfig
 from insuree.models import Insuree
@@ -48,8 +49,12 @@ def generate_insuree_number(location=None):
     modulo_len = len(str(modulo))
 
     if location:
-        main_number = location.id * (10 ** (length - modulo_len - get_location_id_len())) \
-                      + get_random(length - get_location_id_len() - modulo_len)
+        try:
+            main_number = int(location.code) * (10 ** (length - modulo_len - get_location_id_len(location.type))) \
+                          + get_random(length - get_location_id_len(location.type) - modulo_len)
+        except ValueError:
+            logger.error("Computing a QR code with a location that is not numeric will fail its modulo")
+            raise
     else:
         main_number = get_random(length - modulo_len)
     checksum = main_number % modulo
@@ -63,12 +68,14 @@ def get_random(length):
 
 
 @lru_cache(maxsize=None)
-def get_location_id_len():
+def get_location_id_len(location_type):
     """
-    Determines the length of the location ID and saves it in a global variable for performance
-    :return: length of the biggest Location.id
+    Determines the length of the location code and saves it in cache for performance
+    :return: length of the biggest Location.code
     """
-    return len(str(Location.objects.aggregate(Max("id")).get("id__max")))
+    return Location.objects.filter(type=location_type, validity_to__isnull=True)\
+        .annotate(code_len=Length("code"))\
+        .aggregate(max_len=Max("code_len"))["max_len"]
 
 
 def export_insurees(batch=None, amount=None, dry_run=False):
