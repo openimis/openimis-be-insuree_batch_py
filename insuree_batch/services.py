@@ -91,7 +91,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
             zip_file_path = tempfile.NamedTemporaryFile("wb", prefix="insuree_export", suffix=".zip", delete=False)
 
             for insuree in to_export:
-                if insuree.photo:
+                if insuree.photo and insuree.photo.photo:
                     photo_filename = os.path.join(tmp_dir_name, f"{insuree.chf_id}.jpg")
                     files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
                 else:
@@ -101,7 +101,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                     insuree.other_names,
                     insuree.last_name,
                     insuree.dob,
-                    insuree.gender.code,
+                    insuree.gender_id,
                 ])
 
                 if photo_filename:
