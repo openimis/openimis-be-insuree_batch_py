@@ -87,25 +87,28 @@ def batch_qr(request):
     layout1 = ss.VBoxLayout()
     layout1.setSpacing(10)
     counter = 0
-    images_on_page = 2
+    images_on_page = int(os.environ.get("IMAGES_ON_PAGE") or 1)
     image_counter = 1
     merged_list = []
 
-    for file in all_svgs:
-        # if (counter < images_on_page):
-        layout1.addSVG(file, alignment=ss.AlignCenter)
-        counter = counter + 1
+    if (images_on_page > 1):
+        for file in all_svgs:
 
-        if (counter == images_on_page or all_svgs.index(file) == len(all_svgs) - 1):
-            counter = 0
-            doc.setLayout(layout1)
-            filename = F'{abs_path}/cards/{batch.id}/{image_counter}.svg'
-            merged_list.append(filename)
-            doc.save(filename)
-            image_counter = image_counter + 1
+            layout1.addSVG(file, alignment=ss.AlignCenter)
+            counter = counter + 1
 
-            layout1 = ss.VBoxLayout()
-            layout1.setSpacing(10)
+            if (counter == images_on_page or all_svgs.index(file) == len(all_svgs) - 1):
+                counter = 0
+                doc.setLayout(layout1)
+                filename = F'{abs_path}/cards/{batch.id}/{image_counter}.svg'
+                merged_list.append(filename)
+                doc.save(filename)
+                image_counter = image_counter + 1
+
+                layout1 = ss.VBoxLayout()
+                layout1.setSpacing(10)
+    else:
+        merged_list = all_svgs
 
     inkscale_path = os.environ.get("INKSCALE")
 
