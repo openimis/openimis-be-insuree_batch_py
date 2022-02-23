@@ -34,8 +34,8 @@ def batch_qr(request):
     factory = qrcode.image.svg.SvgImage
     insuree_ids = []
 
-    file_name = "front.svg"
-    template_folder = "templates/insuree_batch"
+    file_name = InsureeBatchConfig.front_template_name
+    template_folder = InsureeBatchConfig.template_folder
     abs_path = Path(__file__).absolute().parent
     file_fullpath = F'{abs_path}/{template_folder}/{file_name}'
     card_folder = F'{abs_path}/cards/{batch.id}'
@@ -87,7 +87,7 @@ def batch_qr(request):
     layout1 = ss.VBoxLayout()
     layout1.setSpacing(10)
     counter = 0
-    images_on_page = int(os.environ.get("IMAGES_ON_PAGE") or 1)
+    images_on_page = int(InsureeBatchConfig.images_on_page or 1)
     image_counter = 1
     merged_list = []
 
@@ -110,7 +110,7 @@ def batch_qr(request):
     else:
         merged_list = all_svgs
 
-    inkscale_path = os.environ.get("INKSCALE")
+    inkscale_path = InsureeBatchConfig.inkscale_path
 
     for merged_image in merged_list:
         pdf_abspath = merged_image.split('.')[0]
