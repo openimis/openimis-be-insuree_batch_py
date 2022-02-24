@@ -32,7 +32,6 @@ def batch_qr(request):
     batch = get_object_or_404(InsureeBatch, id=batch_id)
 
     factory = qrcode.image.svg.SvgImage
-    insuree_ids = []
 
     file_name = InsureeBatchConfig.front_template_name
     template_folder = InsureeBatchConfig.template_folder
@@ -47,6 +46,7 @@ def batch_qr(request):
     if os.path.exists(card_folder) == False:
         os.makedirs(card_folder)
 
+    # Replace parameters value with actual values
     for item in batch.insuree_numbers.all():
         img = qrcode.make(
             item.insuree_number, image_factory=factory, box_size=10, border=0
@@ -54,33 +54,46 @@ def batch_qr(request):
 
         stream = BytesIO()
         img.save(stream)
-        # insuree_ids.append(
-        #     {"insuree_number": item.insuree_number,
-        #         "qr": stream.getvalue().decode()}
-        # )
 
         with open(file_fullpath, "r") as f:
             card = f.read()
 
-        location = "National"
-        if batch.location != None:
-            location = batch.location.name
-
-        card = card.replace("@@SerialNumber", "")
-        card = card.replace("@@InsuranceNumber", item.insuree_number)
-        card = card.replace("@@Location", location)
-        card = card.replace(
-            "@@QRCode", stream.getvalue().decode().replace("<?xml version='1.0' encoding='UTF-8'?>", "")
-            .replace("width=\"21mm\" height=\"21mm\"", "width=\"100%\" viewBox=\"0 0 100 100\""))
+        card = write_parameter_values(card, batch, item, stream)
 
         with open(F'{card_folder}/{item.insuree_number}.svg', "wt") as f:
             f.write(card)
 
-        insuree_ids.append(
-            {"insuree_number": item.insuree_number,
-                "qr": card}
-        )
+    # Merge all the svg files based on default configuration 'images_on_page'
+    merged_list = merge_svgs(card_folder, abs_path, batch.id)
 
+    # Write PDFs
+    write_pdf(merged_list)
+
+    # Merge all the PDFs in a single PDF file
+    merge_pdfs(card_folder, abs_path, batch.id)
+
+    # Remove files/folder
+    shutil.rmtree(card_folder)
+
+    return FileResponse(open(F'{abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
+
+
+def write_parameter_values(card, batch, insuree_number, qr_code_stream):
+    location = "National"
+    if batch.location != None:
+        location = batch.location.name
+
+    card = card.replace("@@SerialNumber", "")
+    card = card.replace("@@InsuranceNumber", insuree_number.insuree_number)
+    card = card.replace("@@Location", location)
+    card = card.replace(
+        "@@QRCode", qr_code_stream.getvalue().decode().replace("<?xml version='1.0' encoding='UTF-8'?>", "")
+        .replace("width=\"21mm\" height=\"21mm\"", "width=\"100%\" viewBox=\"0 0 100 100\""))
+
+    return card
+
+
+def merge_svgs(card_folder, abs_path, batchid):
     doc = ss.Document()
     all_svgs = [f for f in glob.glob(F'{card_folder}/*.svg')]
 
@@ -100,7 +113,7 @@ def batch_qr(request):
             if (counter == images_on_page or all_svgs.index(file) == len(all_svgs) - 1):
                 counter = 0
                 doc.setLayout(layout1)
-                filename = F'{abs_path}/cards/{batch.id}/{image_counter}.svg'
+                filename = F'{abs_path}/cards/{batchid}/{image_counter}.svg'
                 merged_list.append(filename)
                 doc.save(filename)
                 image_counter = image_counter + 1
@@ -110,32 +123,27 @@ def batch_qr(request):
     else:
         merged_list = all_svgs
 
+    return merged_list
+
+
+def write_pdf(svg_list):
     inkscale_path = InsureeBatchConfig.inkscale_path
 
-    for merged_image in merged_list:
+    for merged_image in svg_list:
         pdf_abspath = merged_image.split('.')[0]
         p = subprocess.run([
             inkscale_path + 'inkscape', '--without-gui',  '--export-area-drawing', merged_image,  '--export-pdf', F'{pdf_abspath}' + '.pdf'])
 
+
+def merge_pdfs(source_path, abs_path, batchid):
     merged_object = PdfFileMerger()
 
-    all_pdfs = [f for f in glob.glob(F'{card_folder}/*.pdf')]
+    all_pdfs = [f for f in glob.glob(F'{source_path}/*.pdf')]
 
     for pdf in all_pdfs:
         merged_object.append(PdfFileReader(pdf, 'rb'))
 
-    merged_object.write(F'{abs_path}/cards/{batch.id}.pdf')
-
-    # Remove files
-    shutil.rmtree(card_folder)
-
-    return FileResponse(open(F'{abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
-
-    # return render(
-    #     request,
-    #     "insuree_batch/batch_qr.html",
-    #     {"insuree_ids": insuree_ids, "batch": batch},
-    # )
+    merged_object.write(F'{abs_path}/cards/{batchid}.pdf')
 
 
 def export_insurees(request):
