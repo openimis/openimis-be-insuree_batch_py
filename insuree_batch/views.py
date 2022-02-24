@@ -26,8 +26,9 @@ import svg_stack as ss
 
 
 def batch_qr(request):
-    # if not request.user.has_perms(InsureeBatchConfig.gql_query_batch_runs_perms):
-    #     raise PermissionDenied(_("unauthorized"))
+    if not request.user.has_perms(InsureeBatchConfig.gql_query_batch_runs_perms):
+        raise PermissionDenied(_("unauthorized"))
+
     batch_id = request.GET.get("batch")
     batch = get_object_or_404(InsureeBatch, id=batch_id)
 
