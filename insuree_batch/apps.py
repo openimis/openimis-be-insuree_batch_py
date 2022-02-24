@@ -8,7 +8,7 @@ DEFAULT_CFG = {
     "template_folder": "templates/insuree_batch",
     "front_template_name": "front.svg",
     "images_on_page": 1,
-    "inkscale_path": "C:\\Program Files\\Inkscape\\"
+    "inscape_path": "C:\\Program Files\\Inkscape\\"
 
 }
 
@@ -21,7 +21,7 @@ class InsureeBatchConfig(AppConfig):
     template_folder = ""
     front_template_name = ""
     images_on_page = 1
-    inkscale_path = ""
+    inscape_path = ""
 
     def _configure_permissions(self, cfg):
         InsureeBatchConfig.gql_query_batch_runs_perms = cfg[
@@ -31,7 +31,7 @@ class InsureeBatchConfig(AppConfig):
         InsureeBatchConfig.template_folder = cfg["template_folder"]
         InsureeBatchConfig.front_template_name = cfg["front_template_name"]
         InsureeBatchConfig.images_on_page = cfg["images_on_page"]
-        InsureeBatchConfig.inkscale_path = cfg["inkscale_path"]
+        InsureeBatchConfig.inscape_path = cfg["inscape_path"]
 
     def ready(self):
         from core.models import ModuleConfiguration

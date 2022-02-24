@@ -128,12 +128,12 @@ def merge_svgs(card_folder, abs_path, batchid):
 
 
 def write_pdf(svg_list):
-    inkscale_path = InsureeBatchConfig.inkscale_path
+    inscape_path = InsureeBatchConfig.inscape_path
 
     for merged_image in svg_list:
         pdf_abspath = merged_image.split('.')[0]
         p = subprocess.run([
-            inkscale_path + 'inkscape', '--without-gui',  '--export-area-drawing', merged_image,  '--export-pdf', F'{pdf_abspath}' + '.pdf'])
+            inscape_path + 'inkscape', '--without-gui',  '--export-area-drawing', merged_image,  '--export-pdf', F'{pdf_abspath}' + '.pdf'])
 
 
 def merge_pdfs(source_path, abs_path, batchid):
