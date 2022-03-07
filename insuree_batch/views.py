@@ -23,6 +23,7 @@ from .models import InsureeBatch
 import os
 from PyPDF2 import PdfFileMerger, PdfFileReader
 import svg_stack as ss
+from django.conf import settings
 
 
 def batch_qr(request):
@@ -34,15 +35,16 @@ def batch_qr(request):
 
     factory = qrcode.image.svg.SvgImage
 
-    file_name = InsureeBatchConfig.front_template_name
+    file_name = InsureeBatchConfig.insuree_card_template_name
     template_folder = InsureeBatchConfig.template_folder
-    abs_path = Path(__file__).absolute().parent
+    abs_path = Path(settings.BASE_DIR).parent
     file_fullpath = F'{abs_path}/{template_folder}/{file_name}'
-    card_folder = F'{abs_path}/cards/{batch.id}'
+    module_abs_path = Path(__file__).absolute().parent
+    card_folder = F'{module_abs_path}/cards/{batch.id}'
 
     # if the pdf is already created display it
-    if os.path.isfile(F'{abs_path}/cards/{batch.id}.pdf'):
-        return FileResponse(open(F'{abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
+    if os.path.isfile(F'{module_abs_path}/cards/{batch.id}.pdf'):
+        return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
 
     if os.path.exists(card_folder) == False:
         os.makedirs(card_folder)
@@ -65,18 +67,18 @@ def batch_qr(request):
             f.write(card)
 
     # Merge all the svg files based on default configuration 'images_on_page'
-    merged_list = merge_svgs(card_folder, abs_path, batch.id)
+    merged_list = merge_svgs(card_folder, module_abs_path, batch.id)
 
     # Write PDFs
     write_pdf(merged_list)
 
     # Merge all the PDFs in a single PDF file
-    merge_pdfs(card_folder, abs_path, batch.id)
+    merge_pdfs(card_folder, module_abs_path, batch.id)
 
     # Remove files/folder
     shutil.rmtree(card_folder)
 
-    return FileResponse(open(F'{abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
+    return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
 
 
 def write_parameter_values(card, batch, insuree_number, qr_code_stream):
