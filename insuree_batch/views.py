@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from turtle import width
 
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404, render
 
 from django.core.exceptions import PermissionDenied
@@ -38,15 +38,30 @@ def batch_qr(request):
     file_name_front = InsureeBatchConfig.insuree_card_template_front_name
     file_name_back = InsureeBatchConfig.insuree_card_template_back_name
     template_folder = InsureeBatchConfig.template_folder
+    output_format = InsureeBatchConfig.output_format
     abs_path = Path(settings.BASE_DIR).parent
     file_fullpath_front = F'{abs_path}/{template_folder}/{file_name_front}'
     file_fullpath_back = F'{abs_path}/{template_folder}/{file_name_back}'
     module_abs_path = Path(__file__).absolute().parent
     card_folder = F'{module_abs_path}/cards/{batch.id}'
 
-    # if the pdf is already created display it
-    if os.path.isfile(F'{module_abs_path}/cards/{batch.id}.pdf'):
+    if file_name_front == '' and file_name_back == '':
+        return HttpResponse("Template not defined")
+
+    if file_name_front != '' and os.path.exists(file_fullpath_front) == False:
+        return HttpResponse("Front template not found")
+
+    if file_name_back != '' and os.path.exists(file_fullpath_back) == False:
+        return HttpResponse("Back template not found")
+
+    # if the pdf is already created and the output option is set to PDF display it
+
+    if output_format.lower() == 'pdf' and os.path.isfile(F'{module_abs_path}/cards/{batch.id}.pdf'):
         return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
+
+    # if the svg is already created and the output option is set to SVG display it
+    if output_format.lower() == 'svg' and os.path.isfile(F'{module_abs_path}/cards/{batch.id}.zip'):
+        return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.zip', 'rb'), content_type='application/zip')
 
     if os.path.exists(F'{card_folder}/front') == False:
         os.makedirs(F'{card_folder}/front')
@@ -64,43 +79,59 @@ def batch_qr(request):
         img.save(stream)
 
         # Writing the front of the ID
-        prepare_svg(file_fullpath_front,
-                    F'{card_folder}/front', batch, item, stream)
+        if file_name_front != '':
+            prepare_svg(file_fullpath_front,
+                        F'{card_folder}/front', batch, item, stream)
 
         # Writing the back of the ID
         if file_name_back != '':
             prepare_svg(file_fullpath_back,
                         F'{card_folder}/back', batch, item, stream)
 
-    # Merge all the front svg files based on default configuration 'images_on_page'
-    merged_list_front = merge_svgs(
-        F'{card_folder}/front', module_abs_path, batch.id)
+    if output_format.lower() == 'pdf':
+        handle_pdf(file_name_front, file_name_back,
+                   card_folder, module_abs_path, batch.id)
+        return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
+    else:
+        shutil.make_archive(F'{module_abs_path}/cards/{batch.id}',
+                            'zip', F'{module_abs_path}/cards/{batch.id}')
 
-    # Write PDFs (Front)
-    write_pdf(merged_list_front)
+        # Remove files/folder
+        shutil.rmtree(card_folder)
+
+        return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.zip', 'rb'), content_type='application/zip')
+
+
+def handle_pdf(front_name, back_name, card_folder, working_dir, batch_id):
+    # Merge all the front svg files based on default configuration 'images_on_page'
+    if front_name != '':
+        merged_list_front = merge_svgs(
+            F'{card_folder}/front', working_dir, batch_id)
+
+        # Write PDFs (Front)
+        write_pdf(merged_list_front)
 
     # Merge all the back svg files based on default configuration 'images_on_page'
-    if file_name_back != '':
+    if back_name != '':
         merged_list_back = merge_svgs(
-            F'{card_folder}/back', module_abs_path, batch.id)
+            F'{card_folder}/back', working_dir, batch_id)
 
         # Write PDFs (Back)
         write_pdf(merged_list_back)
 
     # Merge all the PDFs in a single PDF file
-    merge_pdfs(F'{card_folder}/front',
-               F'{module_abs_path}/cards/{batch_id}', '1')
+    if front_name != '':
+        merge_pdfs(F'{card_folder}/front',
+                   F'{working_dir}/cards/{batch_id}', '1')
 
-    if file_name_back != '':
+    if back_name != '':
         merge_pdfs(F'{card_folder}/back',
-                   F'{module_abs_path}/cards/{batch_id}', '2')
+                   F'{working_dir}/cards/{batch_id}', '2')
 
-    merge_pdfs(card_folder, F'{module_abs_path}/cards', batch.id)
+    merge_pdfs(card_folder, F'{working_dir}/cards', batch_id)
 
     # Remove files/folder
     shutil.rmtree(card_folder)
-
-    return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
 
 
 def prepare_svg(source_path, destination_path, batch, item, stream):

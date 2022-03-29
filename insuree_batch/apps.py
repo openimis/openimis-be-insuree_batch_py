@@ -9,7 +9,8 @@ DEFAULT_CFG = {
     "insuree_card_template_front_name": "insuree_card_template_front.svg",
     "insuree_card_template_back_name": "insuree_card_template_back.svg",
     "images_on_page": 1,
-    "inscape_path": "C:\\Program Files\\Inkscape\\"
+    "inscape_path": "C:\\Program Files\\Inkscape\\",
+    "output_format": "svg"  # Available options are PDF, SVG
 
 }
 
@@ -24,6 +25,7 @@ class InsureeBatchConfig(AppConfig):
     insuree_card_template_back_name = ""
     images_on_page = 1
     inscape_path = ""
+    output_format = ""
 
     def _configure_permissions(self, cfg):
         InsureeBatchConfig.gql_query_batch_runs_perms = cfg[
@@ -37,6 +39,7 @@ class InsureeBatchConfig(AppConfig):
             "insuree_card_template_back_name"]
         InsureeBatchConfig.images_on_page = cfg["images_on_page"]
         InsureeBatchConfig.inscape_path = cfg["inscape_path"]
+        InsureeBatchConfig.output_format = cfg["output_format"]
 
     def ready(self):
         from core.models import ModuleConfiguration
