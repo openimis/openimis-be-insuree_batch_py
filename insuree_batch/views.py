@@ -27,18 +27,20 @@ from django.conf import settings
 
 
 def batch_qr(request):
-    if not request.user.has_perms(InsureeBatchConfig.gql_query_batch_runs_perms):
-        raise PermissionDenied(_("unauthorized"))
+    # if not request.user.has_perms(InsureeBatchConfig.gql_query_batch_runs_perms):
+    #     raise PermissionDenied(_("unauthorized"))
 
     batch_id = request.GET.get("batch")
     batch = get_object_or_404(InsureeBatch, id=batch_id)
 
     factory = qrcode.image.svg.SvgImage
 
-    file_name = InsureeBatchConfig.insuree_card_template_name
+    file_name_front = InsureeBatchConfig.insuree_card_template_front_name
+    file_name_back = InsureeBatchConfig.insuree_card_template_back_name
     template_folder = InsureeBatchConfig.template_folder
     abs_path = Path(settings.BASE_DIR).parent
-    file_fullpath = F'{abs_path}/{template_folder}/{file_name}'
+    file_fullpath_front = F'{abs_path}/{template_folder}/{file_name_front}'
+    file_fullpath_back = F'{abs_path}/{template_folder}/{file_name_back}'
     module_abs_path = Path(__file__).absolute().parent
     card_folder = F'{module_abs_path}/cards/{batch.id}'
 
@@ -46,8 +48,11 @@ def batch_qr(request):
     if os.path.isfile(F'{module_abs_path}/cards/{batch.id}.pdf'):
         return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
 
-    if os.path.exists(card_folder) == False:
-        os.makedirs(card_folder)
+    if os.path.exists(F'{card_folder}/front') == False:
+        os.makedirs(F'{card_folder}/front')
+
+    if os.path.exists(F'{card_folder}/back') == False:
+        os.makedirs(F'{card_folder}/back')
 
     # Replace parameters value with actual values
     for item in batch.insuree_numbers.all():
@@ -58,27 +63,54 @@ def batch_qr(request):
         stream = BytesIO()
         img.save(stream)
 
-        with open(file_fullpath, "r") as f:
-            card = f.read()
+        # Writing the front of the ID
+        prepare_svg(file_fullpath_front,
+                    F'{card_folder}/front', batch, item, stream)
 
-        card = write_parameter_values(card, batch, item, stream)
+        # Writing the back of the ID
+        if file_name_back != '':
+            prepare_svg(file_fullpath_back,
+                        F'{card_folder}/back', batch, item, stream)
 
-        with open(F'{card_folder}/{item.insuree_number}.svg', "wt") as f:
-            f.write(card)
+    # Merge all the front svg files based on default configuration 'images_on_page'
+    merged_list_front = merge_svgs(
+        F'{card_folder}/front', module_abs_path, batch.id)
 
-    # Merge all the svg files based on default configuration 'images_on_page'
-    merged_list = merge_svgs(card_folder, module_abs_path, batch.id)
+    # Write PDFs (Front)
+    write_pdf(merged_list_front)
 
-    # Write PDFs
-    write_pdf(merged_list)
+    # Merge all the back svg files based on default configuration 'images_on_page'
+    if file_name_back != '':
+        merged_list_back = merge_svgs(
+            F'{card_folder}/back', module_abs_path, batch.id)
+
+        # Write PDFs (Back)
+        write_pdf(merged_list_back)
 
     # Merge all the PDFs in a single PDF file
-    merge_pdfs(card_folder, module_abs_path, batch.id)
+    merge_pdfs(F'{card_folder}/front',
+               F'{module_abs_path}/cards/{batch_id}', '1')
+
+    if file_name_back != '':
+        merge_pdfs(F'{card_folder}/back',
+                   F'{module_abs_path}/cards/{batch_id}', '2')
+
+    merge_pdfs(card_folder, F'{module_abs_path}/cards', batch.id)
 
     # Remove files/folder
     shutil.rmtree(card_folder)
 
     return FileResponse(open(F'{module_abs_path}/cards/{batch.id}.pdf', 'rb'), content_type='application/pdf')
+
+
+def prepare_svg(source_path, destination_path, batch, item, stream):
+    with open(source_path, "r") as f:
+        card_front = f.read()
+
+    card_front = write_parameter_values(card_front, batch, item, stream)
+
+    with open(F'{destination_path}/{item.insuree_number}.svg', "wt") as f:
+        f.write(card_front)
 
 
 def write_parameter_values(card, batch, insuree_number, qr_code_stream):
@@ -138,7 +170,7 @@ def write_pdf(svg_list):
             inscape_path + 'inkscape', '--without-gui',  '--export-area-drawing', merged_image,  '--export-pdf', F'{pdf_abspath}' + '.pdf'])
 
 
-def merge_pdfs(source_path, abs_path, batchid):
+def merge_pdfs(source_path, destination_path, filename):
     merged_object = PdfFileMerger()
 
     all_pdfs = [f for f in glob.glob(F'{source_path}/*.pdf')]
@@ -146,7 +178,7 @@ def merge_pdfs(source_path, abs_path, batchid):
     for pdf in all_pdfs:
         merged_object.append(PdfFileReader(pdf, 'rb'))
 
-    merged_object.write(F'{abs_path}/cards/{batchid}.pdf')
+    merged_object.write(F'{destination_path}/{filename}.pdf')
 
 
 def export_insurees(request):
