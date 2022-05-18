@@ -43,9 +43,16 @@ def generate_insuree_numbers(amount, audit_user_id, location=None, comment=None)
     return batch
 
 
+# noinspection PyStringFormat
 def generate_insuree_number(location=None):
     length = InsureeConfig.get_insuree_number_length()
     modulo = InsureeConfig.get_insuree_number_modulo_root()
+    if length is None or modulo is None:
+        logging.warning("The settings do not specify an insuree number length. This normally means that they are not "
+                        "validated by openIMIS. However, this doesn't make sense when generating insuree numbers. "
+                        "We are using 9 and 7 as default values but you should configure these in the settings")
+        length = 9
+        modulo = 7
     modulo_len = len(str(modulo))
 
     if location:
@@ -58,6 +65,7 @@ def generate_insuree_number(location=None):
     else:
         main_number = get_random(length - modulo_len)
     checksum = main_number % modulo
+    # generates "%010d" that is then formatted with the actual insuree number. This confuses the IDE => noinspection
     padded_main = f"%0{length - modulo_len}d" % main_number
     padded_checksum = f"%0{modulo_len}d" % checksum
     return f"{padded_main}{padded_checksum}"

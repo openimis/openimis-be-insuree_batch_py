@@ -101,8 +101,8 @@ class InsureeBatchTest(TestCase):
             temp_ins.photo_id = photo.id
             temp_ins.save()
         # Limit to less than available
-        zip = export_insurees(batch=batch)
-        self.assertIsNotNone(zip)
+        zip_file = export_insurees(batch=batch)
+        self.assertIsNotNone(zip_file)
         # TODO check the zip file in depth
 
         for insuree in insurees:
