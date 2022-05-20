@@ -25,6 +25,8 @@ setup(
         "openimis-be-location",
         "openimis-be-insuree",
         "qrcode",
+        "PyPDF2",
+        "svg_stack"
     ],
     classifiers=[
         "Environment :: Web Environment",
