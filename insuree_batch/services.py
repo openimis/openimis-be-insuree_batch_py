@@ -133,8 +133,11 @@ def export_insurees(batch=None, amount=None, dry_run=False):
 
 def get_insurees_to_export(batch, amount):
     # Since there is no foreign key from the batch to insuree, Django refuses to make a join or subquery 🤷🏻‍
-    # TODO make this DB independent, (TOP %s is SQL Server only)
-    sql = 'select ' + (f"TOP {int(amount)}" if amount and "sql_server" in settings.DB_ENGINE else "") + \
+    if hasattr(settings, "DB_ENGINE") and "postgres" in settings.DB_ENGINE:
+        engine = "postgres"
+    else:
+        engine = "mssql"
+    sql = 'select ' + (f"TOP {int(amount)}" if amount and engine == "mssql" else "") + \
           ' "tblInsuree".* ' \
           'from "tblInsuree" ' \
           'inner join insuree_batch_batchinsureenumber ibb on "tblInsuree"."CHFID" = ibb."CHFID" ' \
@@ -144,7 +147,7 @@ def get_insurees_to_export(batch, amount):
         sql = sql + " and ibb.batch_id=%s"
         params.append(str(batch.id).replace("-", ""))
 
-    if amount and "postgres" in settings.DB_ENGINE:
+    if amount and engine == "postgres":
         sql += f" LIMIT {int(amount)}"
 
     queryset = Insuree.objects.raw(sql, params)
