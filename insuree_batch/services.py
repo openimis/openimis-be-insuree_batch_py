@@ -8,6 +8,7 @@ import zipfile
 from datetime import datetime
 from functools import lru_cache
 
+from django.conf import settings
 from django.db.models import Max
 from django.db.models.functions import Length
 
@@ -133,14 +134,18 @@ def export_insurees(batch=None, amount=None, dry_run=False):
 def get_insurees_to_export(batch, amount):
     # Since there is no foreign key from the batch to insuree, Django refuses to make a join or subquery 🤷🏻‍
     # TODO make this DB independent, (TOP %s is SQL Server only)
-    sql = "select " + (f"TOP {int(amount)}" if amount else "") + " tblInsuree.* " \
-          "from tblInsuree " \
-          "inner join insuree_batch_batchinsureenumber ibb on tblInsuree.CHFID = ibb.CHFID " \
-          "where ibb.print_date is null"
+    sql = 'select ' + (f"TOP {int(amount)}" if amount and "sql_server" in settings.DB_ENGINE else "") + \
+          ' "tblInsuree".* ' \
+          'from "tblInsuree" ' \
+          'inner join insuree_batch_batchinsureenumber ibb on "tblInsuree"."CHFID" = ibb."CHFID" ' \
+          'where ibb.print_date is null '
     params = []
     if batch:
         sql = sql + " and ibb.batch_id=%s"
         params.append(str(batch.id).replace("-", ""))
+
+    if amount and "postgres" in settings.DB_ENGINE:
+        sql += f" LIMIT {int(amount)}"
 
     queryset = Insuree.objects.raw(sql, params)
     return queryset

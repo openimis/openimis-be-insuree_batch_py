@@ -8,12 +8,14 @@ from django.core.exceptions import PermissionDenied
 from django.utils.translation import gettext as _
 import qrcode
 import qrcode.image.svg
+from rest_framework.decorators import api_view
 
 from . import services
 from .apps import InsureeBatchConfig
 from .models import InsureeBatch
 
 
+@api_view(["GET"])
 def batch_qr(request):
     if not request.user.has_perms(InsureeBatchConfig.gql_query_batch_runs_perms):
         raise PermissionDenied(_("unauthorized"))
@@ -39,6 +41,7 @@ def batch_qr(request):
     )
 
 
+@api_view(["GET"])
 def export_insurees(request):
     if not request.user.has_perms(InsureeBatchConfig.gql_query_batch_runs_perms):
         raise PermissionDenied(_("unauthorized"))
