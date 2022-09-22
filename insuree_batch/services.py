@@ -105,21 +105,28 @@ def export_insurees(batch=None, amount=None, dry_run=False):
             zip_file_path = tempfile.NamedTemporaryFile("wb", prefix="insuree_export", suffix=".zip", delete=False)
 
             for insuree in to_export:
-                if insuree.photo and insuree.photo.photo:
-                    photo_filename = os.path.join(tmp_dir_name, f"{insuree.chf_id}.jpg")
-                    files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
-                else:
-                    photo_filename = None
                 from core import datetimedelta
                 latest_policy = insuree\
                     .insuree_policies\
                     .filter(validity_to__isnull=True)\
                     .order_by("-effective_date")\
                     .first()
+                if not latest_policy:
+                    logger.debug(f"Insuree {insuree.chf_id} has no policy, skipping")
+                    continue
+                if not insuree.family:
+                    logger.debug(f"Insuree {insuree.chf_id} has no family, skipping")
+                    continue
                 village = insuree.family.location
                 ward = village.parent if village else None
                 district = ward.parent if ward else None
                 region = district.parent if district else None
+
+                if insuree.photo and insuree.photo.photo:
+                    photo_filename = os.path.join(tmp_dir_name, f"{insuree.chf_id}.jpg")
+                    files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
+                else:
+                    photo_filename = None
 
                 # TODO Make the validity and date formats configurable
                 writer.writerow([
