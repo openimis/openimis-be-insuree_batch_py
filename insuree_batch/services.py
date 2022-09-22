@@ -96,6 +96,11 @@ def export_insurees(batch=None, amount=None, dry_run=False):
         with open(csv_file_path, 'w') as f:
             # create the csv writer
             writer = csv.writer(f)
+            writer.writerow([
+                "InsureeNum", "OtherNames", "LastName", "DateOfBirth", "Gender", "Phone", "EffectiveDate",
+                "ValidityDate", "VillageCode", "VillageName", "WardCode", "WardName", "DistrictCode", "DistrictName",
+                "RegionCode", "RegionName",
+            ])
             files_to_zip = [(csv_file_path, "index.csv")]
             zip_file_path = tempfile.NamedTemporaryFile("wb", prefix="insuree_export", suffix=".zip", delete=False)
 
@@ -105,12 +110,37 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                     files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
                 else:
                     photo_filename = None
+                from core import datetimedelta
+                latest_policy = insuree\
+                    .insuree_policies\
+                    .filter(validity_to__isnull=True)\
+                    .order_by("-effective_date")\
+                    .first()
+                village = insuree.family.location
+                ward = village.parent if village else None
+                district = ward.parent if ward else None
+                region = district.parent if district else None
+
+                # TODO Make the validity and date formats configurable
                 writer.writerow([
                     insuree.chf_id,
                     insuree.other_names,
                     insuree.last_name,
-                    insuree.dob,
+                    insuree.dob.strftime('%d/%m/%Y') if insuree.dob else None,
                     insuree.gender_id,
+                    insuree.phone,
+                    latest_policy.effective_date.strftime('%d/%m/%Y')
+                    if latest_policy and latest_policy.effective_date else None,
+                    (latest_policy.effective_date + datetimedelta(years=2)).strftime('%d/%m/%Y')
+                    if latest_policy and latest_policy.effective_date else None,
+                    village.code,
+                    village.name,
+                    ward.code,
+                    ward.name,
+                    district.code,
+                    district.name,
+                    region.code,
+                    region.name,
                 ])
 
                 if photo_filename:
