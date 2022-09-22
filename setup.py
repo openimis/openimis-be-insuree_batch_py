@@ -9,7 +9,7 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name="openimis-be-insuree_batch",
-    version="1.4.2",
+    version="1.4.3",
     packages=find_packages(),
     include_package_data=True,
     license="GNU AGPL v3",

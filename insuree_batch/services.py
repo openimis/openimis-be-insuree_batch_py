@@ -99,7 +99,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
             writer.writerow([
                 "InsureeNum", "OtherNames", "LastName", "DateOfBirth", "Gender", "Phone", "EffectiveDate",
                 "ValidityDate", "VillageCode", "VillageName", "WardCode", "WardName", "DistrictCode", "DistrictName",
-                "RegionCode", "RegionName",
+                "RegionCode", "RegionName", "Filename"
             ])
             files_to_zip = [(csv_file_path, "index.csv")]
             zip_file_path = tempfile.NamedTemporaryFile("wb", prefix="insuree_export", suffix=".zip", delete=False)
@@ -148,6 +148,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                     district.name,
                     region.code,
                     region.name,
+                    f"{insuree.chf_id}.jpg" if photo_filename else None,
                 ])
 
                 if photo_filename:
