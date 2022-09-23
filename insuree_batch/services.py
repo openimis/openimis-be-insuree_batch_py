@@ -3,6 +3,7 @@ import csv
 import logging
 import os
 import random
+import shutil
 import tempfile
 import zipfile
 from datetime import datetime
@@ -122,7 +123,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                 district = ward.parent if ward else None
                 region = district.parent if district else None
 
-                if insuree.photo and insuree.photo.photo:
+                if insuree.photo and insuree.photo.photo or insuree.photo.filename:
                     photo_filename = os.path.join(tmp_dir_name, f"{insuree.chf_id}.jpg")
                     files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
                 else:
@@ -152,10 +153,15 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                 ])
 
                 if photo_filename:
-                    with open(photo_filename, "wb") as photo_file:
-                        photo_bytes = insuree.photo.photo.encode("utf-8")
-                        decoded_photo = base64.decodebytes(photo_bytes)
-                        photo_file.write(decoded_photo)
+                    if insuree.photo.photo:
+                        with open(photo_filename, "wb") as photo_file:
+                            photo_bytes = insuree.photo.photo.encode("utf-8")
+                            decoded_photo = base64.decodebytes(photo_bytes)
+                            photo_file.write(decoded_photo)
+                    elif insuree.photo.filename:
+                        shutil.copyfile(insuree.photo.full_file_path(), photo_filename)
+                    else:
+                        logger.warning("Photo was identified but neither base64 photo nor filename")
 
         if not dry_run:
             BatchInsureeNumber.objects\
