@@ -3,6 +3,7 @@ import csv
 import logging
 import os
 import random
+import re
 import shutil
 import tempfile
 import zipfile
@@ -167,10 +168,18 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                         if not photo_root_path:
                             logger.error("PHOTO_ROOT_PATH is not configured, please set it up")
                         else:
+                            insuree_photo_folder = insuree.photo.folder if insuree.photo.folder else ""
+                            # os.path.join("/xxx", "/Updated", "file.jpg") will result in /Updated, so strip the /
+                            insuree_photo_folder = re.sub("^[/\\\\]", "", insuree_photo_folder)
                             full_path = os.path.join(
                                 photo_root_path,
-                                insuree.photo.folder if insuree.photo.folder else "",
+                                insuree_photo_folder,
                                 insuree.photo.filename)
+                            if not os.path.exists(full_path) and "Images" in insuree_photo_folder:
+                                full_path = os.path.join(
+                                    photo_root_path,
+                                    re.sub(r"Images([/\\\\])", "", insuree_photo_folder),
+                                    insuree.photo.filename)
                             try:
                                 shutil.copyfile(full_path, photo_filename)
                                 files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
