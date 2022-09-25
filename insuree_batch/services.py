@@ -100,7 +100,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
             writer.writerow([
                 "InsureeNum", "OtherNames", "LastName", "DateOfBirth", "Gender", "Phone", "EffectiveDate",
                 "ValidityDate", "VillageCode", "VillageName", "WardCode", "WardName", "DistrictCode", "DistrictName",
-                "RegionCode", "RegionName", "Filename"
+                "RegionCode", "RegionName", "Filename", "Error"
             ])
             files_to_zip = [(csv_file_path, "index.csv")]
             zip_file_path = tempfile.NamedTemporaryFile("wb", prefix="insuree_export", suffix=".zip", delete=False)
@@ -125,12 +125,11 @@ def export_insurees(batch=None, amount=None, dry_run=False):
 
                 if insuree.photo and (insuree.photo.photo or insuree.photo.filename):
                     photo_filename = os.path.join(tmp_dir_name, f"{insuree.chf_id}.jpg")
-                    files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
                 else:
                     photo_filename = None
 
                 # TODO Make the validity and date formats configurable
-                writer.writerow([
+                row_to_write = [
                     insuree.chf_id,
                     insuree.other_names,
                     insuree.last_name,
@@ -150,7 +149,8 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                     region.code,
                     region.name,
                     f"{insuree.chf_id}.jpg" if photo_filename else None,
-                ])
+                    ""
+                ]
 
                 if photo_filename:
                     if insuree.photo.photo:
@@ -158,6 +158,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                             photo_bytes = insuree.photo.photo.encode("utf-8")
                             decoded_photo = base64.decodebytes(photo_bytes)
                             photo_file.write(decoded_photo)
+                        files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
                     elif insuree.photo.filename:
                         # After 2022-10 release gets out, this whole block should be this sole line:
                         # shutil.copyfile(insuree.photo.full_file_path(), photo_filename)
@@ -170,10 +171,15 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                                 photo_root_path,
                                 insuree.photo.folder if insuree.photo.folder else "",
                                 insuree.photo.filename)
-                            shutil.copyfile(full_path, photo_filename)
+                            try:
+                                shutil.copyfile(full_path, photo_filename)
+                                files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
+                            except Exception as exc:
+                                row_to_write[-2] = ""
+                                row_to_write[-1] = f"Could not copy file {full_path}: {exc}"
                     else:
                         logger.warning("Photo was identified but neither base64 photo nor filename")
-
+                writer.writerow(row_to_write)
         if not dry_run:
             BatchInsureeNumber.objects\
                 .filter(insuree_number__in=[i.chf_id for i in to_export])\
