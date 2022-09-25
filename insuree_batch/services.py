@@ -123,7 +123,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                 district = ward.parent if ward else None
                 region = district.parent if district else None
 
-                if insuree.photo and insuree.photo.photo or insuree.photo.filename:
+                if insuree.photo and (insuree.photo.photo or insuree.photo.filename):
                     photo_filename = os.path.join(tmp_dir_name, f"{insuree.chf_id}.jpg")
                     files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
                 else:
@@ -159,7 +159,18 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                             decoded_photo = base64.decodebytes(photo_bytes)
                             photo_file.write(decoded_photo)
                     elif insuree.photo.filename:
-                        shutil.copyfile(insuree.photo.full_file_path(), photo_filename)
+                        # After 2022-10 release gets out, this whole block should be this sole line:
+                        # shutil.copyfile(insuree.photo.full_file_path(), photo_filename)
+                        # But we are missing some deps for Niger, so we reimplement a custom version until then
+                        photo_root_path = os.getenv("PHOTO_ROOT_PATH", None)
+                        if not photo_root_path:
+                            logger.error("PHOTO_ROOT_PATH is not configured, please set it up")
+                        else:
+                            full_path = os.path.join(
+                                photo_root_path,
+                                insuree.photo.folder if insuree.photo.folder else "",
+                                insuree.photo.filename)
+                            shutil.copyfile(full_path, photo_filename)
                     else:
                         logger.warning("Photo was identified but neither base64 photo nor filename")
 
