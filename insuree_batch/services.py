@@ -101,7 +101,7 @@ def export_insurees(batch=None, amount=None, dry_run=False):
             writer.writerow([
                 "InsureeNum", "OtherNames", "LastName", "DateOfBirth", "Gender", "Phone", "EffectiveDate",
                 "ValidityDate", "VillageCode", "VillageName", "WardCode", "WardName", "DistrictCode", "DistrictName",
-                "RegionCode", "RegionName", "Filename", "Error"
+                "RegionCode", "RegionName", "Filename", "Error", "EnrollmentDate",
             ])
             files_to_zip = [(csv_file_path, "index.csv")]
             zip_file_path = tempfile.NamedTemporaryFile("wb", prefix="insuree_export", suffix=".zip", delete=False)
@@ -150,7 +150,9 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                     region.code,
                     region.name,
                     f"{insuree.chf_id}.jpg" if photo_filename else None,
-                    ""
+                    "",
+                    latest_policy.enrollment_date.strftime('%d/%m/%Y')
+                    if latest_policy and latest_policy.enrollment_date else None,
                 ]
 
                 if photo_filename:
@@ -184,8 +186,8 @@ def export_insurees(batch=None, amount=None, dry_run=False):
                                 shutil.copyfile(full_path, photo_filename)
                                 files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
                             except Exception as exc:
-                                row_to_write[-2] = ""
-                                row_to_write[-1] = f"Could not copy file {full_path}: {exc}"
+                                row_to_write[-3] = ""
+                                row_to_write[-2] = f"Could not copy file {full_path}: {exc}"
                     else:
                         logger.warning("Photo was identified but neither base64 photo nor filename")
                 writer.writerow(row_to_write)
