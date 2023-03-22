@@ -1,12 +1,9 @@
 import graphene
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.db import connection
 from core import prefix_filterset, ExtendedConnection
 from core.schema import OpenIMISMutation, OrderedDjangoFilterConnectionField
-from graphene import ObjectType
 from django.urls import reverse
 from graphene_django import DjangoObjectType
-from graphene_django.filter import DjangoFilterConnectionField
 from django.contrib.auth.models import AnonymousUser
 
 from location.models import Location
@@ -25,7 +22,9 @@ logger = logging.getLogger(__file__)
 class InsureeBatchGQLType(DjangoObjectType):
     print_url = graphene.Field(graphene.String)
     export_url = graphene.Field(
-        graphene.String, dry_run=graphene.Boolean(), count=graphene.Int()
+        graphene.String,
+        dry_run=graphene.Boolean(),
+        count=graphene.Int()
     )
     nb_generated = graphene.Field(graphene.Int)
     nb_printed = graphene.Field(graphene.Int)

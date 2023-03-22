@@ -55,10 +55,10 @@ def generate_insuree_number(location=None):
         length = 9
         modulo = 7
     modulo_len = len(str(modulo))
-
+    digital_code = extract_digits_from_code(location.code)
     if location:
         try:
-            main_number = int(location.code) * (10 ** (length - modulo_len - get_location_id_len(location.type))) \
+            main_number = digital_code * (10 ** (length - modulo_len - get_location_id_len(location.type))) \
                           + get_random(length - get_location_id_len(location.type) - modulo_len)
         except ValueError:
             logger.error("Computing a QR code with a location that is not numeric will fail its modulo")
@@ -70,6 +70,11 @@ def generate_insuree_number(location=None):
     padded_main = f"%0{length - modulo_len}d" % main_number
     padded_checksum = f"%0{modulo_len}d" % checksum
     return f"{padded_main}{padded_checksum}"
+
+
+def extract_digits_from_code(raw_code: str) -> int:
+    digital_code = [x for x in raw_code if x.isdigit()]
+    return int("".join(digital_code))
 
 
 def get_random(length):
