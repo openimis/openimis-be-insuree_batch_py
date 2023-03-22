@@ -2,11 +2,13 @@ import random
 from django.test import TestCase, override_settings
 
 from core.models import Officer
+from .models import InsureeBatch
 from insuree.apps import InsureeConfig
 from insuree.services import validate_insuree_number
 from insuree.test_helpers import create_test_insuree, create_test_photo
 from location.models import Location
 from location.test_helpers import create_test_location
+from .test_helpers import create_test_batch
 from .services import get_random, generate_insuree_number, generate_insuree_numbers, get_insurees_to_export, \
     export_insurees, get_location_id_len
 
@@ -108,3 +110,12 @@ class InsureeBatchTest(TestCase):
         for insuree in insurees:
             insuree.delete()
         batch.delete()
+
+    def test_fetch_batches(self):
+        test_region = create_test_location('R', custom_props={"code": "71"})
+        test_district = create_test_location('D', custom_props={"code": "23"})
+        create_test_batch(test_region)
+        create_test_batch(test_district)
+        queryset = InsureeBatch.objects.filter(location=test_region.id)
+        self.assertIsNotNone(queryset)
+        self.assertEqual(len(queryset), 1)

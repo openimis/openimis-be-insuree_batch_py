@@ -6,8 +6,12 @@ from location import models as location_models
 
 class InsureeBatch(core_models.UUIDModel):
     location = models.ForeignKey(
-        location_models.Location, models.DO_NOTHING,
-        db_column='LocationId', blank=True, null=True)
+        "location.Location",
+        models.DO_NOTHING,
+        db_column="LocationId",
+        blank=True,
+        null=True,
+    )
     audit_user_id = models.IntegerField(db_column='AuditUserID')
     run_date = fields.DateTimeField(db_column='RunDate', auto_now_add=True)
     archived = models.BooleanField(default=False)

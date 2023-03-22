@@ -76,6 +76,7 @@ class Query(graphene.ObjectType):
     insuree_batches = OrderedDjangoFilterConnectionField(
         InsureeBatchGQLType,
         client_mutation_id=graphene.String(),
+        location=graphene.Int(),
         orderBy=graphene.List(of_type=graphene.String),
     )
 
@@ -83,18 +84,28 @@ class Query(graphene.ObjectType):
         InsureeBatchGQLType, orderBy=graphene.List(of_type=graphene.String)
     )
 
-    def resolve_insuree_batches(self, info, client_mutation_id=None, **kwargs):
+    def resolve_insuree_batches(
+            self,
+            info,
+            client_mutation_id=None,
+            location=None,
+            **kwargs
+    ):
         if not info.context.user.has_perms(
             InsureeBatchConfig.gql_query_batch_runs_perms
         ):
             raise PermissionDenied(_("unauthorized"))
+        queryset = InsureeBatch.objects.all()
         if client_mutation_id:
-            queryset = InsureeBatch.objects.filter(
+            queryset = queryset.filter(
                 Q(mutations__mutation__client_mutation_id=client_mutation_id)
             )
-        else:
-            queryset = InsureeBatch.objects
-
+        elif location is not None:
+            queryset = queryset.filter(
+                Q(location__in=Location.objects.parents(location))
+                | Q(location__id=location)
+                | Q(location__isnull=True)
+            )
         return queryset
 
     def resolve_batch_insuree_numbers(self, info, **kwargs):
