@@ -57,8 +57,8 @@ def generate_insuree_number(location=None):
         length = 9
         modulo = 7
     modulo_len = len(str(modulo))
-    digital_code = extract_digits_from_code(location.code)
     if location:
+        digital_code = extract_digits_from_code(location.code)
         try:
             main_number = digital_code * (10 ** (length - modulo_len - get_location_id_len(location.type))) \
                           + get_random(length - get_location_id_len(location.type) - modulo_len)
