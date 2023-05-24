@@ -3,6 +3,8 @@ import csv
 import logging
 import os
 import random
+import re
+import shutil
 import tempfile
 import zipfile
 from datetime import datetime
@@ -55,10 +57,10 @@ def generate_insuree_number(location=None):
         length = 9
         modulo = 7
     modulo_len = len(str(modulo))
-
     if location:
+        digital_code = extract_digits_from_code(location.code)
         try:
-            main_number = int(location.code) * (10 ** (length - modulo_len - get_location_id_len(location.type))) \
+            main_number = digital_code * (10 ** (length - modulo_len - get_location_id_len(location.type))) \
                           + get_random(length - get_location_id_len(location.type) - modulo_len)
         except ValueError:
             logger.error("Computing a QR code with a location that is not numeric will fail its modulo")
@@ -70,6 +72,11 @@ def generate_insuree_number(location=None):
     padded_main = f"%0{length - modulo_len}d" % main_number
     padded_checksum = f"%0{modulo_len}d" % checksum
     return f"{padded_main}{padded_checksum}"
+
+
+def extract_digits_from_code(raw_code: str) -> int:
+    digital_code = [x for x in raw_code if x.isdigit()]
+    return int("".join(digital_code))
 
 
 def get_random(length):
@@ -96,29 +103,99 @@ def export_insurees(batch=None, amount=None, dry_run=False):
         with open(csv_file_path, 'w') as f:
             # create the csv writer
             writer = csv.writer(f)
+            writer.writerow([
+                "InsureeNum", "OtherNames", "LastName", "DateOfBirth", "Gender", "Phone", "EffectiveDate",
+                "ValidityDate", "VillageCode", "VillageName", "WardCode", "WardName", "DistrictCode", "DistrictName",
+                "RegionCode", "RegionName", "Filename", "Error", "EnrollmentDate",
+            ])
             files_to_zip = [(csv_file_path, "index.csv")]
             zip_file_path = tempfile.NamedTemporaryFile("wb", prefix="insuree_export", suffix=".zip", delete=False)
 
             for insuree in to_export:
-                if insuree.photo and insuree.photo.photo:
+                from core import datetimedelta
+                latest_policy = insuree\
+                    .insuree_policies\
+                    .filter(validity_to__isnull=True)\
+                    .order_by("-effective_date")\
+                    .first()
+                if not latest_policy:
+                    logger.debug(f"Insuree {insuree.chf_id} has no policy, skipping")
+                    continue
+                if not insuree.family:
+                    logger.debug(f"Insuree {insuree.chf_id} has no family, skipping")
+                    continue
+                village = insuree.family.location
+                ward = village.parent if village else None
+                district = ward.parent if ward else None
+                region = district.parent if district else None
+
+                if insuree.photo and (insuree.photo.photo or insuree.photo.filename):
                     photo_filename = os.path.join(tmp_dir_name, f"{insuree.chf_id}.jpg")
-                    files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
                 else:
                     photo_filename = None
-                writer.writerow([
+
+                # TODO Make the validity and date formats configurable
+                row_to_write = [
                     insuree.chf_id,
                     insuree.other_names,
                     insuree.last_name,
-                    insuree.dob,
+                    insuree.dob.strftime('%d/%m/%Y') if insuree.dob else None,
                     insuree.gender_id,
-                ])
+                    insuree.phone,
+                    latest_policy.effective_date.strftime('%d/%m/%Y')
+                    if latest_policy and latest_policy.effective_date else None,
+                    (latest_policy.effective_date + datetimedelta(years=2)).strftime('%d/%m/%Y')
+                    if latest_policy and latest_policy.effective_date else None,
+                    village.code,
+                    village.name,
+                    ward.code,
+                    ward.name,
+                    district.code,
+                    district.name,
+                    region.code,
+                    region.name,
+                    f"{insuree.chf_id}.jpg" if photo_filename else None,
+                    "",
+                    latest_policy.enrollment_date.strftime('%d/%m/%Y')
+                    if latest_policy and latest_policy.enrollment_date else None,
+                ]
 
                 if photo_filename:
-                    with open(photo_filename, "wb") as photo_file:
-                        photo_bytes = insuree.photo.photo.encode("utf-8")
-                        decoded_photo = base64.decodebytes(photo_bytes)
-                        photo_file.write(decoded_photo)
-
+                    if insuree.photo.photo:
+                        with open(photo_filename, "wb") as photo_file:
+                            photo_bytes = insuree.photo.photo.encode("utf-8")
+                            decoded_photo = base64.decodebytes(photo_bytes)
+                            photo_file.write(decoded_photo)
+                        files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
+                    elif insuree.photo.filename:
+                        # After 2022-10 release gets out, this whole block should be this sole line:
+                        # shutil.copyfile(insuree.photo.full_file_path(), photo_filename)
+                        # But we are missing some deps for Niger, so we reimplement a custom version until then
+                        photo_root_path = os.getenv("PHOTO_ROOT_PATH", None)
+                        if not photo_root_path:
+                            logger.error("PHOTO_ROOT_PATH is not configured, please set it up")
+                        else:
+                            insuree_photo_folder = insuree.photo.folder if insuree.photo.folder else ""
+                            # os.path.join("/xxx", "/Updated", "file.jpg") will result in /Updated, so strip the /
+                            insuree_photo_folder = re.sub("^[/\\\\]", "", insuree_photo_folder)
+                            full_path = os.path.join(
+                                photo_root_path,
+                                insuree_photo_folder,
+                                insuree.photo.filename)
+                            if not os.path.exists(full_path) and "Images" in insuree_photo_folder:
+                                full_path = os.path.join(
+                                    photo_root_path,
+                                    re.sub(r"Images([/\\\\])", "", insuree_photo_folder),
+                                    insuree.photo.filename)
+                            try:
+                                shutil.copyfile(full_path, photo_filename)
+                                files_to_zip.append((photo_filename, f"{insuree.chf_id}.jpg"))
+                            except Exception as exc:
+                                row_to_write[-3] = ""
+                                row_to_write[-2] = f"Could not copy file {full_path}: {exc}"
+                    else:
+                        logger.warning("Photo was identified but neither base64 photo nor filename")
+                writer.writerow(row_to_write)
         if not dry_run:
             BatchInsureeNumber.objects\
                 .filter(insuree_number__in=[i.chf_id for i in to_export])\

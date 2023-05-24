@@ -1,5 +1,5 @@
 from claim_batch.models import RelativeDistribution
-
+from .models import InsureeBatch
 
 def create_test_rel_distr_range(product_id, dist_type, care_type, percent, custom_props=None):
     if dist_type == 1:
@@ -21,3 +21,14 @@ def create_test_rel_distr_range(product_id, dist_type, care_type, percent, custo
                 **(custom_props if custom_props else {})
             }
         )
+
+
+def create_test_batch(location):
+    return InsureeBatch.objects.create(
+        **{
+            "location": location,
+            "audit_user_id": 1,
+            "archived": False,
+        }
+    )
+
