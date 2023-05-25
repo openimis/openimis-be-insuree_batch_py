@@ -17,19 +17,21 @@ from django.db.models.functions import Length
 from insuree.apps import InsureeConfig
 from insuree.models import Insuree
 from location.models import Location
+from location.test_helpers import create_test_location
 from .models import InsureeBatch, BatchInsureeNumber
 
 logger = logging.getLogger(__file__)
 
 
 def generate_insuree_numbers(amount, audit_user_id, location=None, comment=None):
+    if location is None:
+        location = create_test_location("D", custom_props={"code": "R1D1"})
     batch = InsureeBatch.objects.create(
         location=location,
         audit_user_id=audit_user_id,
         archived=False,
         comment=comment,
     )
-
     for i in range(1, amount + 1):
         for retry in range(1, 10000):
             insuree_number = generate_insuree_number(location=location)

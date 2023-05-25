@@ -2,6 +2,7 @@ import random
 from django.test import TestCase, override_settings
 
 from core.models import Officer
+from policy.test_helpers import create_test_insuree_for_policy
 from .models import InsureeBatch
 from insuree.apps import InsureeConfig
 from insuree.services import validate_insuree_number
@@ -67,12 +68,14 @@ class InsureeBatchTest(TestCase):
     def test_get_insurees_to_export(self):
         random.seed(11)
         test_location = Location.objects.filter(validity_to__isnull=True).order_by("-id").first()
-        batch = generate_insuree_numbers(10, 1, test_location, "Test comment")
+        test_location.save()
+        batch = generate_insuree_numbers(10, 1, None, "Test comment")
         batch_insurees = batch.insuree_numbers.all()[0:3]
-        insurees = []
+        insurees = families = []
         for batch_insuree in batch_insurees:
-            insurees.append(create_test_insuree(with_family=True,
-                                                custom_props={"chf_id": batch_insuree.insuree_number}))
+            temp_insuree, temp_family = create_test_insuree_for_policy(with_family=True, custom_props={"chf_id": batch_insuree.insuree_number})
+            insurees.append(temp_insuree)
+            families.append(temp_family)
 
         # Limit to less than available
         result = get_insurees_to_export(batch, 2)
@@ -82,6 +85,8 @@ class InsureeBatchTest(TestCase):
         result = get_insurees_to_export(batch, 5)
         self.assertIsNotNone(result)
         self.assertEqual(len(result), 3)
+        for family in families:
+            family.delete()
         for insuree in insurees:
             self.assertIn(insuree, result)
             insuree.delete()
@@ -94,11 +99,12 @@ class InsureeBatchTest(TestCase):
         test_officer = Officer.objects.filter(validity_to__isnull=True).order_by("-id").first()
         batch = generate_insuree_numbers(10, 1, test_location, "Test comment")
         batch_insurees = batch.insuree_numbers.all()[0:3]
-        insurees = []
+        insurees = families = []
         for batch_insuree in batch_insurees:
-            temp_ins = create_test_insuree(with_family=True,
+            temp_ins, temp_family = create_test_insuree_for_policy(with_family=True,
                                            custom_props={"chf_id": batch_insuree.insuree_number})
             insurees.append(temp_ins)
+            families.append(temp_family)
             photo = create_test_photo(insuree_id=temp_ins.id, officer_id=test_officer.id)
             temp_ins.photo_id = photo.id
             temp_ins.save()
@@ -106,9 +112,13 @@ class InsureeBatchTest(TestCase):
         zip_file = export_insurees(batch=batch)
         self.assertIsNotNone(zip_file)
         # TODO check the zip file in depth
+        for family_insure_pair in range(len(insurees)):
+            try:
+                families[family_insure_pair].delete()
+                insurees[family_insure_pair].delete()
+            except:
+                pass
 
-        for insuree in insurees:
-            insuree.delete()
         batch.delete()
 
     def test_fetch_batches(self):
